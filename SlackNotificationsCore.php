@@ -400,35 +400,26 @@ class SlackNotifications
 			}
 		}
 
+		$post = array();
+
 		$slackColor = "warning";
 		if ($bgColor == "green") $slackColor = "good";
 		else if ($bgColor == "red") $slackColor = "danger";
-		
-		$optionalChannel = "";
 		if (!empty($wgSlackRoomName)) {
-			$optionalChannel = ' "channel": "'.$wgSlackRoomName.'", ';
+			$post["channel"] = $wgSlackRoomName;
 		}
-
-		// Convert " to ' in the message to be sent as otherwise JSON formatting would break.
-		$message = str_replace('"', "'", $message);
-		//Ensure a random \ is not read as the beginning of an escape character. Windows users may be authenticated with a username containing domain\user, so to ensure \ is encoded as \\...
-		$message = str_replace('\\', "\\\\", $message);
 
 		$slackFromName = $wgSlackFromName;
 		if ( $slackFromName == "" )
 		{
 			$slackFromName = $wgSitename;
 		}
-		
-		$post = sprintf('payload={"username": "%s",'.$optionalChannel.' "attachments": [ { "text": "%s", "color": "%s" } ]',
-		urlencode($slackFromName),
-		urlencode($message),
-		urlencode($slackColor));
+		$post["username"] = $slackFromName;
+		$post["attachments"] = array(array("text" => $message, "color" => $slackColor));
 		if ( $wgSlackEmoji != "" )
 		{
-			$post .= sprintf( ', "icon_emoji": "%s"', $wgSlackEmoji );
+			$post["icon_emoji"] = $wgSlackEmoji;
 		}
-		$post .= '}';
 
 		// Use file_get_contents to send the data. Note that you will need to have allow_url_fopen enabled in php.ini for this to work.
 		if ($wgSlackSendMethod == "file_get_contents") {
@@ -436,7 +427,7 @@ class SlackNotifications
 				'http' => array(
 				'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
 				'method'  => 'POST',
-				'content' => $post,
+				'content' => urlencode('payload='.json_encode($post)),
 				),
 			);
 			$context = stream_context_create($extradata);
@@ -447,7 +438,7 @@ class SlackNotifications
 			$h = curl_init();
 			curl_setopt($h, CURLOPT_URL, $wgSlackIncomingWebhookUrl);
 			curl_setopt($h, CURLOPT_POST, 1);
-			curl_setopt($h, CURLOPT_POSTFIELDS, $post);
+			curl_setopt($h, CURLOPT_POSTFIELDS, urlencode('payload='.json_encode($post)));
 			curl_setopt($h, CURLOPT_RETURNTRANSFER, true);
 			// Commented out lines below. Using default curl settings for host and peer verification.
 			//curl_setopt ($h, CURLOPT_SSL_VERIFYHOST, 0);
